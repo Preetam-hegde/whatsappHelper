@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Web AI Settings</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="logo-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+          </svg>
+        </div>
+        <div>
+          <h1>WhatsApp AI Assistant</h1>
+          <p class="subtitle">OpenRouter Powered</p>
+        </div>
+      </div>
+      <div class="status-badge" id="status-badge">
+        <span class="dot"></span>
+        <span id="status-text">Not Configured</span>
+      </div>
+    </header>
+
+    <!-- Main Form -->
+    <main class="content">
+      <!-- API Key Input -->
+      <div class="form-group">
+        <label for="api-key">API Key (OpenRouter or Google AI Studio)</label>
+        <div class="input-with-action">
+          <input type="password" id="api-key" placeholder="sk-or-v1-... or AQ..." autocomplete="off">
+          <button type="button" id="toggle-key" class="btn-icon" title="Toggle Visibility">👁️</button>
+        </div>
+        <div id="key-type-indicator" class="key-type-badge hidden"></div>
+        <p class="field-hint">OpenRouter (<a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai</a>) or Google AI Studio key starting with <code>AQ...</code></p>
+      </div>
+
+      <!-- Model Selector -->
+      <div class="form-group">
+        <label for="model-preset">AI Model Choice</label>
+        <select id="model-preset">
+          <optgroup label="✨ Google AI Studio Models (AQ... Key)">
+            <option value="gemini-3.6-flash">✨ Gemini 3.6 Flash (Recommended)</option>
+            <option value="gemini-3.5-flash">⚡ Gemini 3.5 Flash</option>
+            <option value="gemini-3.1-pro-preview">🧠 Gemini 3.1 Pro Preview</option>
+            <option value="gemini-3.5-flash-lite">🚀 Gemini 3.5 Flash Lite</option>
+            <option value="gemini-3.1-flash-lite">⚡ Gemini 3.1 Flash Lite</option>
+          </optgroup>
+          <optgroup label="🌐 OpenRouter Models">
+            <option value="qwen/qwen3.7-flash">🌐 Qwen 3.7 Flash</option>
+            <option value="openai/gpt-oss-20b:free">🎁 OpenAI GPT OSS 20B (Free)</option>
+            <option value="deepseek/deepseek-v4-flash-latest">⚡ DeepSeek V4 Flash</option>
+            <option value="meta-llama/llama-3.3-70b-instruct">🦙 Meta Llama 3.3 70B Instruct</option>
+            <option value="anthropic/claude-3.5-sonnet">🧠 Anthropic Claude 3.5 Sonnet</option>
+          </optgroup>
+          <option value="custom">✏️ Custom Model String...</option>
+        </select>
+        <div id="custom-model-container" class="hidden margin-top">
+          <input type="text" id="custom-model" placeholder="e.g. gemini-3.6-flash or qwen/qwen-2.5-72b-instruct">
+        </div>
+      </div>
+
+      <!-- Context History Depth -->
+      <div class="form-group">
+        <label for="history-depth">Chat History Context Depth</label>
+        <select id="history-depth">
+          <option value="5">Last 5 messages</option>
+          <option value="10">Last 10 messages</option>
+          <option value="15" selected>Last 15 messages (Recommended)</option>
+          <option value="20">Last 20 messages</option>
+          <option value="30">Last 30 messages (Deep Context)</option>
+        </select>
+      </div>
+
+      <!-- Custom System Instructions -->
+      <div class="form-group">
+        <label for="system-prompt">System Persona / Instructions</label>
+        <textarea id="system-prompt" rows="2" placeholder="Custom instructions for AI reply generation..."></textarea>
+      </div>
+
+      <!-- Connection Test & Save -->
+      <div class="actions">
+        <button type="button" id="btn-test" class="btn btn-secondary">⚡ Test Key</button>
+        <button type="button" id="btn-save" class="btn btn-primary">💾 Save Settings</button>
+      </div>
+
+      <div id="alert-box" class="alert hidden"></div>
+    </main>
+
+    <!-- Footer Privacy -->
+    <footer class="footer">
+      <div class="privacy-note">
+        🔒 <span>100% Private & Direct — Key stored in local Chrome storage.</span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="../prompts.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
