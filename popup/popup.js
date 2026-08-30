@@ -2,6 +2,9 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
   const apiKeyInput = document.getElementById('api-key');
+  const providerSelect = document.getElementById('provider');
+  const ollamaModelGroup = document.getElementById('ollama-model-group');
+  const ollamaModelInput = document.getElementById('ollama-model');
   const toggleKeyBtn = document.getElementById('toggle-key');
   const modelSelect = document.getElementById('model-preset');
   const customModelContainer = document.getElementById('custom-model-container');
@@ -23,10 +26,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     'openrouterApiKey',
     'openrouterModel',
     'historyDepth',
-    'systemPrompt'
+    'systemPrompt',
+    'provider',
+    'ollamaModel'
   ]);
+  providerSelect.value = storage.provider || 'auto';
+  ollamaModelInput.value = storage.ollamaModel || 'qwen3';
 
   const keyTypeIndicator = document.getElementById('key-type-indicator');
+
+  function updateProviderUi() {
+    const local = providerSelect.value === 'ollama';
+    apiKeyInput.closest('.form-group').classList.toggle('hidden', local);
+    ollamaModelGroup.classList.toggle('hidden', !local);
+  }
+  providerSelect.addEventListener('change', updateProviderUi);
+  updateProviderUi();
 
   function checkKeyType(key) {
     const trimmed = key ? key.trim() : '';
@@ -115,13 +130,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   btnSave.addEventListener('click', async () => {
+    const provider = providerSelect.value;
     const apiKey = apiKeyInput.value.trim();
     const selectedModel = getSelectedModel();
     const historyDepth = parseInt(historyDepthSelect.value, 10) || 15;
     const systemPrompt = systemPromptInput.value.trim();
 
-    if (!apiKey) {
-      showAlert('Please enter a valid OpenRouter API Key.', 'error');
+    if (!apiKey && provider !== 'ollama') {
+      showAlert('Enter a cloud API key or choose Ollama (local).', 'error');
       return;
     }
 
@@ -129,7 +145,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       openrouterApiKey: apiKey,
       openrouterModel: selectedModel,
       historyDepth: historyDepth,
-      systemPrompt: systemPrompt
+      systemPrompt,
+      provider,
+      ollamaModel: ollamaModelInput.value.trim() || 'qwen3'
     });
 
     updateStatusBadge(true, 'Saved');
@@ -139,9 +157,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   btnTest.addEventListener('click', async () => {
     const apiKey = apiKeyInput.value.trim();
     const modelName = getSelectedModel();
+    const provider = providerSelect.value;
 
-    if (!apiKey) {
-      showAlert('Please enter an API key first to test connection.', 'error');
+    if (!apiKey && provider !== 'ollama') {
+      showAlert('Enter a cloud API key or choose Ollama (local).', 'error');
       return;
     }
 
@@ -152,7 +171,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const response = await chrome.runtime.sendMessage({
         action: 'VALIDATE_KEY',
-        data: { apiKey, modelName }
+        data: { apiKey, modelName, provider, ollamaModel: ollamaModelInput.value.trim() || 'qwen3' }
       });
 
       if (response && response.valid) {

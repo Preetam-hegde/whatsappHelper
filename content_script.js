@@ -197,7 +197,7 @@
   /**
    * Inserts text into WhatsApp Web's contenteditable input field properly.
    */
-  function insertTextIntoInput(text) {
+  function insertTextIntoInput(text, replaceAll = false) {
     const inputEl = document.querySelector(SELECTORS.chatInput);
     if (!inputEl) {
       showErrorToast('Could not locate WhatsApp chat input field.');
@@ -206,17 +206,9 @@
 
     inputEl.focus();
 
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) {
-      const range = sel.getRangeAt(0);
-      range.deleteContents();
-      const textNode = document.createTextNode(text);
-      range.insertNode(textNode);
-      range.setStartAfter(textNode);
-      range.setEndAfter(textNode);
-      sel.removeAllRanges();
-      sel.addRange(range);
-
+    if (replaceAll) {
+      inputEl.innerHTML = '';
+      inputEl.appendChild(document.createTextNode(text));
       inputEl.dispatchEvent(new InputEvent('input', {
         bubbles: true,
         cancelable: true,
@@ -224,10 +216,29 @@
         data: text
       }));
     } else {
-      const inserted = document.execCommand('insertText', false, text);
-      if (!inserted) {
-        inputEl.innerText = text;
-        inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        const textNode = document.createTextNode(text);
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.setEndAfter(textNode);
+        sel.removeAllRanges();
+        sel.addRange(range);
+
+        inputEl.dispatchEvent(new InputEvent('input', {
+          bubbles: true,
+          cancelable: true,
+          inputType: 'insertText',
+          data: text
+        }));
+      } else {
+        const inserted = document.execCommand('insertText', false, text);
+        if (!inserted) {
+          inputEl.innerText = text;
+          inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+        }
       }
     }
 
@@ -313,7 +324,7 @@
       setLoadingState(false);
 
       if (response?.success) {
-        insertTextIntoInput(response.refinedText);
+        insertTextIntoInput(response.refinedText, true);
         const vagueInput = document.querySelector('.wa-ai-vague-input');
         if (vagueInput) vagueInput.value = '';
       } else {
@@ -372,6 +383,9 @@
     if (!toolbar) return;
 
     let statusText = toolbar.querySelector('.wa-ai-status');
+    toolbar.setAttribute('aria-busy', String(isLoading));
+    const refineButton = toolbar.querySelector('.wa-ai-vague-send');
+    if (refineButton) refineButton.disabled = isLoading;
 
     if (isLoading) {
       toolbar.classList.add('wa-ai-loading');
@@ -702,14 +716,14 @@
 
         <!-- Vague Thought Input -->
         <div class="wa-ai-vague-group" title="Type rough thought (e.g. late 10m traffic, shift call?) to refine into natural replies">
-          <span class="wa-ai-vague-icon">✏️</span>
-          <input type="text" class="wa-ai-custom-input wa-ai-vague-input" placeholder="Type rough idea (e.g. late 10m traffic)..." />
-          <button class="wa-ai-tone-btn wa-ai-vague-send" title="Refine rough idea into all tones">⚡ Refine</button>
+          <span class="wa-ai-vague-icon" aria-hidden="true">✏️</span>
+          <input type="text" class="wa-ai-custom-input wa-ai-vague-input" aria-label="Optional text to refine" placeholder="Optional text to refine..." />
+          <button type="button" class="wa-ai-tone-btn wa-ai-vague-send" title="Refine text">⚡ Refine</button>
         </div>
 
         <div class="wa-ai-status-container">
           <div class="wa-ai-spinner"></div>
-          <span class="wa-ai-status">Generating...</span>
+          <span class="wa-ai-status" aria-live="polite">Generating...</span>
         </div>
       </div>
     `;

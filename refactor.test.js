@@ -17,5 +17,7 @@ assert.strictEqual(JSON.stringify(context.getModelsToTry('sk-test', 'qwen/qwen3.
 assert.strictEqual(JSON.stringify(context.getModelsToTry('AIza-test', 'google/gemini-3.5-flash')), JSON.stringify([
   'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-pro-preview', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash'
 ]));
+assert.strictEqual(context.isOllamaProvider('ollama'), true);
+assert.strictEqual(context.isOllamaProvider('openrouter'), false);
 
 console.log('refactor helper test passed');

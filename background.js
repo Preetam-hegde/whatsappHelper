@@ -25,6 +25,10 @@ function isGoogleStudioKey(key) {
   return k.startsWith('AQ') || k.startsWith('AIza');
 }
 
+function isOllamaProvider(provider) {
+  return provider === 'ollama';
+}
+
 function getModelsToTry(apiKey, rawModel) {
   if (isGoogleStudioKey(apiKey)) {
     let model = rawModel;
@@ -71,6 +75,25 @@ async function callOpenRouter(apiKey, model, systemPrompt, userPrompt, temperatu
   return choice?.message?.content || choice?.text || '';
 }
 
+async function callOllama(model, systemPrompt, userPrompt, temperature) {
+  const response = await fetch('http://localhost:11434/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: model || 'qwen3',
+      messages: [
+        ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
+        { role: 'user', content: userPrompt }
+      ],
+      stream: false,
+      options: { temperature }
+    })
+  });
+  if (!response.ok) throw new Error(`Ollama HTTP ${response.status}`);
+  const data = await response.json();
+  return data.message?.content || '';
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'GENERATE_REPLY' || request.action === 'GENERATE_SUGGESTIONS') {
     handleGenerateSuggestions(request.data)
@@ -105,20 +128,23 @@ async function handleRefineText(data) {
   const sourceText = typeof data?.text === 'string' ? data.text.trim() : '';
   if (!sourceText) return { success: false, error: 'Enter some text to refine first.' };
 
-  const storage = await chrome.storage.local.get(['openrouterApiKey', 'openrouterModel']);
+  const storage = await chrome.storage.local.get(['openrouterApiKey', 'openrouterModel', 'provider', 'ollamaModel']);
   const apiKey = storage.openrouterApiKey?.trim();
-  const rawModel = storage.openrouterModel?.trim() || DEFAULT_MODEL;
+  const provider = storage.provider || 'auto';
+  const rawModel = provider === 'ollama' ? (storage.ollamaModel?.trim() || 'qwen3') : (storage.openrouterModel?.trim() || DEFAULT_MODEL);
 
-  if (!apiKey) {
+  if (!apiKey && !isOllamaProvider(provider)) {
     return { success: false, error: 'API Key is missing. Click the extension icon in Chrome toolbar to set your key.' };
   }
 
   const prompt = buildRefinementPrompt(sourceText);
-  const isGoogle = isGoogleStudioKey(apiKey);
+  const isGoogle = !isOllamaProvider(provider) && isGoogleStudioKey(apiKey);
   const model = isGoogle && rawModel.includes('/') ? 'gemini-3.6-flash' : rawModel.replace(/^google\//, '');
   let refinedText = '';
 
-  refinedText = isGoogle
+  refinedText = isOllamaProvider(provider)
+    ? await callOllama(model, 'You refine text only. Return only the refined text.', prompt, 0.4)
+    : isGoogle
     ? await callGoogleAIStudio(apiKey, model, 'You refine text only. Return only the refined text.', prompt)
     : await callOpenRouter(apiKey, model, 'You refine text only. Return only the refined text.', prompt, 0.4, 300);
 
@@ -147,21 +173,24 @@ async function handleGenerateSuggestions(data) {
   const storage = await chrome.storage.local.get([
     'openrouterApiKey',
     'openrouterModel',
+    'provider',
+    'ollamaModel',
     'systemPrompt'
   ]);
 
   const apiKey = storage.openrouterApiKey?.trim();
-  let rawModel = overrideModel || storage.openrouterModel?.trim() || DEFAULT_MODEL;
+  const provider = storage.provider || 'auto';
+  let rawModel = provider === 'ollama' ? (overrideModel || storage.ollamaModel?.trim() || 'qwen3') : (overrideModel || storage.openrouterModel?.trim() || DEFAULT_MODEL);
 
-  if (!apiKey) {
+  if (!apiKey && !isOllamaProvider(provider)) {
     return {
       success: false,
       error: 'API Key is missing. Click the extension icon in Chrome toolbar to set your OpenRouter or Google AI Studio key.'
     };
   }
 
-  const isGoogle = isGoogleStudioKey(apiKey);
-  const modelsToTry = getModelsToTry(apiKey, rawModel);
+  const isGoogle = !isOllamaProvider(provider) && isGoogleStudioKey(apiKey);
+  const modelsToTry = isOllamaProvider(provider) ? [rawModel] : getModelsToTry(apiKey, rawModel);
 
   // Analyze writing style into a structured fingerprint
   const writingStyleBlock = analyzeWritingStyle(userWritingSamples);
@@ -241,7 +270,9 @@ async function handleGenerateSuggestions(data) {
       console.log(`[WhatsApp AI] Generating replies with model: ${currentModel} (GoogleKey: ${isGoogle})`);
       let rawContent = '';
 
-      if (isGoogle) {
+      if (isOllamaProvider(provider)) {
+        rawContent = await callOllama(currentModel, systemPrompt, userPrompt, 0.75);
+      } else if (isGoogle) {
         rawContent = await callGoogleAIStudio(apiKey, currentModel, systemPrompt, userPrompt);
       } else {
         rawContent = await callOpenRouter(apiKey, currentModel, systemPrompt, userPrompt, 0.75, 700);
@@ -290,21 +321,24 @@ async function handleAnalyzePersonStudy(data) {
 
   const storage = await chrome.storage.local.get([
     'openrouterApiKey',
-    'openrouterModel'
+    'openrouterModel',
+    'provider',
+    'ollamaModel'
   ]);
 
   const apiKey = storage.openrouterApiKey?.trim();
-  let rawModel = overrideModel || storage.openrouterModel?.trim() || DEFAULT_MODEL;
+  const provider = storage.provider || 'auto';
+  let rawModel = provider === 'ollama' ? (overrideModel || storage.ollamaModel?.trim() || 'qwen3') : (overrideModel || storage.openrouterModel?.trim() || DEFAULT_MODEL);
 
-  if (!apiKey) {
+  if (!apiKey && !isOllamaProvider(provider)) {
     return {
       success: false,
       error: 'API Key is missing. Please set your key in the extension settings.'
     };
   }
 
-  const isGoogle = isGoogleStudioKey(apiKey);
-  const modelsToTry = getModelsToTry(apiKey, rawModel);
+  const isGoogle = !isOllamaProvider(provider) && isGoogleStudioKey(apiKey);
+  const modelsToTry = isOllamaProvider(provider) ? [rawModel] : getModelsToTry(apiKey, rawModel);
 
   const fullContextText = (Array.isArray(context) && context.length > 0)
     ? context.map((m, i) => `${i + 1}. ${m.isOutgoing ? 'Me' : (m.sender || contactName)}${m.time ? ' [' + m.time + ']' : ''}: "${m.text}"`).join('\n')
@@ -320,7 +354,9 @@ async function handleAnalyzePersonStudy(data) {
       console.log(`[WhatsApp AI] Analyzing Person Study with model: ${currentModel}`);
       let rawContent = '';
 
-      if (isGoogle) {
+      if (isOllamaProvider(provider)) {
+        rawContent = await callOllama(currentModel, systemPrompt, userPrompt, 0.6);
+      } else if (isGoogle) {
         rawContent = await callGoogleAIStudio(apiKey, currentModel, systemPrompt, userPrompt);
       } else {
         rawContent = await callOpenRouter(apiKey, currentModel, systemPrompt, userPrompt, 0.6, 800);
@@ -514,17 +550,20 @@ async function callGoogleAIStudio(apiKey, model, systemPrompt, userPrompt) {
 }
 
 async function handleValidateKey(data) {
-  const { apiKey, modelName } = data;
-  if (!apiKey) {
+  const { apiKey, modelName, provider = 'auto', ollamaModel = 'qwen3' } = data;
+  if (!apiKey && !isOllamaProvider(provider)) {
     return { valid: false, error: 'API key cannot be empty.' };
   }
 
-  const isGoogle = isGoogleStudioKey(apiKey);
-  let testModel = modelName || (isGoogle ? 'gemini-3.6-flash' : DEFAULT_MODEL);
+  const isGoogle = !isOllamaProvider(provider) && isGoogleStudioKey(apiKey);
+  let testModel = isOllamaProvider(provider) ? ollamaModel : (modelName || (isGoogle ? 'gemini-3.6-flash' : DEFAULT_MODEL));
   if (isGoogle && testModel.startsWith('google/')) testModel = testModel.replace('google/', '');
 
   try {
-    if (isGoogle) {
+    if (isOllamaProvider(provider)) {
+      const res = await callOllama(testModel, '', 'Hi', 0);
+      return res ? { valid: true } : { valid: false, error: 'Empty response from Ollama' };
+    } else if (isGoogle) {
       const res = await callGoogleAIStudio(apiKey, testModel, 'Respond Hi', 'Hi');
       if (res) return { valid: true };
       return { valid: false, error: 'Empty response from Google API' };

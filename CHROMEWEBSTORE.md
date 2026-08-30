@@ -11,7 +11,7 @@
   - ⚡ **Floating AI Action Bar**: Injected right above the WhatsApp Web message box.
   - ✨ **Tone Quick-Actions**: Instantly generate Friendly, Direct, Formal, or Brief replies based on the last 5-10 chat messages.
   - 🎨 **Custom Prompts**: Type custom prompt instructions on the fly.
-  - 🔒 **Transparent data flow**: Your key and settings stay in local browser storage; requested chat context is sent directly to your selected AI provider.
+  - 🔒 **Transparent data flow**: Cloud keys and settings stay in local browser storage; requested chat context is sent directly to your selected AI provider, or stays local when using Ollama.
   - 🚀 **Multi-Model Support**: Use any model supported by OpenRouter (Gemini, Claude, Llama, GPT-4o, DeepSeek).
 
 ---
@@ -23,6 +23,7 @@
 | `storage` | Required to securely store user API Key, selected model preference, and persona instructions in local browser storage (`chrome.storage.local`). |
 | `https://web.whatsapp.com/*` | Required to inject the floating AI action bar into WhatsApp Web and read recent chat messages for context awareness. |
 | `https://openrouter.ai/*` | Required to send chat completion API requests directly to OpenRouter's API endpoints. |
+| `http://localhost:11434/*` | Required only when the user selects local Ollama; requests go to the user's local Ollama server. |
 
 ---
 

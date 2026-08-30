@@ -12,4 +12,8 @@ assert.match(prompt, /please send the report tomorrow/);
 assert.doesNotMatch(prompt, /conversation history|ACTIVE UNANSWERED THREAD|Person Study/i);
 assert.match(prompt, /Return only the refined text/i);
 
+const contentScript = fs.readFileSync(__dirname + '/content_script.js', 'utf8');
+assert.match(contentScript, /insertTextIntoInput\(response\.refinedText, true\)/);
+assert.match(contentScript, /aria-label="Optional text to refine"/);
+
 console.log('refine prompt test passed');
