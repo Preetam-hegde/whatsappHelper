@@ -23,6 +23,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: 12.5px;
   line-height: 1.4;
+  overflow-x: hidden;
 }
 
 .popup-container {
@@ -149,6 +150,7 @@ textarea {
   font-size: 12px;
   outline: none;
   transition: border-color 0.2s;
+  min-width: 0;
 }
 
 input:focus, select:focus, textarea:focus {
@@ -163,7 +165,10 @@ textarea {
 .input-with-action {
   display: flex;
   gap: 6px;
+  min-width: 0;
 }
+
+.input-with-action input { flex: 1; }
 
 .btn-icon {
   background: var(--bg-secondary);
@@ -230,6 +235,22 @@ textarea {
   cursor: pointer;
   border: none;
   transition: all 0.2s;
+  min-width: 0;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent-teal);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
+  transform: none;
 }
 
 .btn-primary {
