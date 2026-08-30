@@ -845,3 +845,330 @@
   z-index: 10000;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
+
+/* Compact WhatsApp composer companion */
+:root {
+  --wa-ai-surface: #202c33;
+  --wa-ai-subtle: #111b21;
+  --wa-ai-border: rgba(255, 255, 255, 0.1);
+  --wa-ai-text: #e9edef;
+  --wa-ai-muted: #8696a0;
+  --wa-ai-green: #00a884;
+  --wa-ai-green-hover: #06cf9c;
+}
+
+#wa-ai-floating-toolbar.wa-ai-bar {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  background: var(--wa-ai-surface);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(11, 20, 26, 0.16);
+}
+
+.wa-ai-bar-inner {
+  min-height: 38px;
+  gap: 6px;
+  padding: 5px 8px;
+  overflow: visible;
+}
+
+.wa-ai-logo {
+  padding-right: 7px;
+  color: var(--wa-ai-green);
+}
+
+.wa-ai-tone-btn,
+.wa-ai-intent-btn,
+.wa-ai-more-btn {
+  min-height: 28px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+.wa-ai-auto-btn {
+  padding: 5px 10px;
+  background: var(--wa-ai-green) !important;
+  box-shadow: none;
+}
+
+.wa-ai-auto-btn:hover,
+.wa-ai-vague-send:hover {
+  background: var(--wa-ai-green-hover) !important;
+}
+
+.wa-ai-more-btn {
+  margin-left: auto;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--wa-ai-muted);
+  cursor: pointer;
+}
+
+.wa-ai-more-btn:hover,
+.wa-ai-more-btn[aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--wa-ai-text);
+}
+
+.wa-ai-controls {
+  display: none;
+  gap: 8px;
+  padding: 8px;
+  border-top: 1px solid var(--wa-ai-border);
+}
+
+.wa-ai-bar.wa-ai-expanded .wa-ai-controls {
+  display: grid;
+}
+
+.wa-ai-controls-row,
+.wa-ai-intents-group,
+.wa-ai-tones {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.wa-ai-study-launch-btn,
+.wa-ai-study-launch-btn:hover,
+.wa-ai-study-btn,
+.wa-ai-study-btn:hover {
+  background: rgba(0, 168, 132, 0.12) !important;
+  border: 1px solid rgba(0, 168, 132, 0.35) !important;
+  color: var(--wa-ai-green) !important;
+  box-shadow: none;
+}
+
+.wa-ai-intent-btn,
+.wa-ai-tone-btn:not(.wa-ai-auto-btn):not(.wa-ai-vague-send) {
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--wa-ai-border);
+  color: var(--wa-ai-text);
+}
+
+.wa-ai-intent-btn:hover,
+.wa-ai-tone-btn:not(.wa-ai-auto-btn):not(.wa-ai-vague-send):hover {
+  background: rgba(0, 168, 132, 0.14);
+  border-color: rgba(0, 168, 132, 0.45);
+  color: var(--wa-ai-text);
+}
+
+.wa-ai-vague-group {
+  min-width: 0;
+  max-width: none;
+  width: 100%;
+  padding: 2px 3px 2px 9px;
+  border-radius: 8px;
+  background: var(--wa-ai-subtle);
+}
+
+.wa-ai-vague-send {
+  min-height: 28px;
+  border-radius: 6px !important;
+}
+
+.wa-ai-status-container {
+  margin-left: 0;
+}
+
+/* Reply sheet: compact rows, not a card mosaic. */
+#wa-ai-preview-popover.wa-ai-preview {
+  width: min(420px, calc(100vw - 32px));
+  right: 16px;
+  bottom: 72px;
+  background: var(--wa-ai-surface);
+  border-color: var(--wa-ai-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(11, 20, 26, 0.34);
+}
+
+.wa-ai-preview-header,
+.wa-ai-preview-footer {
+  padding: 10px 12px;
+  background: transparent;
+  border-color: var(--wa-ai-border);
+}
+
+.wa-ai-suggestions-list {
+  gap: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.wa-ai-suggestion-card {
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid var(--wa-ai-border);
+}
+
+.wa-ai-suggestion-card:last-child {
+  border-bottom: 0;
+}
+
+.wa-ai-suggestion-card:hover,
+.wa-ai-suggestion-card.active {
+  background: rgba(0, 168, 132, 0.08);
+}
+
+.wa-ai-card-use-btn {
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: var(--wa-ai-green);
+}
+
+.wa-ai-card-use-btn:hover {
+  background: var(--wa-ai-green-hover);
+}
+
+.wa-ai-card-copy-btn,
+.wa-ai-btn-copy {
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: transparent;
+  border-color: transparent;
+  color: var(--wa-ai-muted);
+}
+
+.wa-ai-card-copy-btn:hover,
+.wa-ai-btn-copy:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--wa-ai-text);
+}
+
+/* Person Study follows the same WhatsApp surface and single green accent. */
+.wa-ai-study-dialog {
+  background: var(--wa-ai-surface);
+  border-color: var(--wa-ai-border);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(11, 20, 26, 0.45);
+}
+
+.wa-ai-study-header {
+  padding: 12px 16px;
+  background: transparent;
+  border-color: var(--wa-ai-border);
+}
+
+.wa-ai-study-badge-beta,
+.wa-ai-study-meta-banner,
+.wa-ai-study-source-badge,
+.wa-ai-tag {
+  background: rgba(0, 168, 132, 0.1);
+  border-color: rgba(0, 168, 132, 0.25);
+  color: var(--wa-ai-green);
+}
+
+.wa-ai-contact-hl,
+.wa-ai-rel-val {
+  color: var(--wa-ai-green);
+}
+
+.wa-ai-study-section {
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.wa-ai-rel-dropdown {
+  border-color: rgba(0, 168, 132, 0.35);
+  color: var(--wa-ai-green);
+}
+
+.wa-ai-golden-label {
+  color: var(--wa-ai-muted);
+}
+
+.wa-ai-golden-textarea {
+  border-color: var(--wa-ai-border);
+  color: var(--wa-ai-text);
+}
+
+.wa-ai-golden-textarea:focus {
+  border-color: var(--wa-ai-green);
+  box-shadow: 0 0 0 1px var(--wa-ai-green);
+}
+
+.wa-ai-study-generate-btn {
+  background: var(--wa-ai-green) !important;
+  box-shadow: none;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --wa-ai-surface: #f7f7f7;
+    --wa-ai-subtle: #ffffff;
+    --wa-ai-border: rgba(11, 20, 26, 0.12);
+    --wa-ai-text: #111b21;
+    --wa-ai-muted: #667781;
+  }
+
+  .wa-ai-custom-input,
+  .wa-ai-card-body,
+  .wa-ai-study-headline,
+  .wa-ai-sec-desc,
+  .wa-ai-strategy-list {
+    color: var(--wa-ai-text);
+  }
+}
+
+/* Keep the trigger compact; expanded tools belong in a floating menu. */
+#wa-ai-floating-toolbar.wa-ai-bar {
+  position: relative;
+  width: fit-content;
+  max-width: calc(100% - 24px);
+  margin: 6px 12px;
+}
+
+.wa-ai-bar-inner {
+  width: auto;
+}
+
+.wa-ai-more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 0;
+  padding: 4px 7px;
+}
+
+.wa-ai-more-chevron {
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translateY(-1px);
+  transition: transform 0.16s ease;
+}
+
+.wa-ai-more-btn[aria-expanded="true"] .wa-ai-more-chevron {
+  transform: rotate(225deg) translate(-1px, -1px);
+}
+
+.wa-ai-controls {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  width: min(620px, calc(100vw - 48px));
+  padding: 10px;
+  background: var(--wa-ai-surface);
+  border: 1px solid var(--wa-ai-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(11, 20, 26, 0.25);
+}
+
+/* WhatsApp clips floating children inside its composer; expand in flow instead. */
+#wa-ai-floating-toolbar.wa-ai-bar.wa-ai-expanded {
+  width: min(620px, calc(100% - 24px));
+}
+
+.wa-ai-bar.wa-ai-expanded .wa-ai-controls {
+  position: static;
+  width: auto;
+  margin: 0;
+  box-shadow: none;
+}

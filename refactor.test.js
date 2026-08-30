@@ -19,5 +19,11 @@ assert.strictEqual(JSON.stringify(context.getModelsToTry('AIza-test', 'google/ge
 ]));
 assert.strictEqual(context.isOllamaProvider('ollama'), true);
 assert.strictEqual(context.isOllamaProvider('openrouter'), false);
+assert.strictEqual(JSON.stringify(context.parseWriteCommand('/poem birthday for Maya')), JSON.stringify({
+  kind: 'poem',
+  request: 'birthday for Maya',
+  title: 'Poem'
+}));
+assert.strictEqual(context.parseWriteCommand('/unknown test'), null);
 
 console.log('refactor helper test passed');

@@ -298,7 +298,6 @@
           customPrompt,
           intent
         );
-        renderQuickPillSuggestions(response.suggestions);
       } else {
         showErrorToast(response?.error || 'Failed to generate replies.');
       }
@@ -329,6 +328,28 @@
         if (vagueInput) vagueInput.value = '';
       } else {
         showErrorToast(response?.error || 'Text refinement failed.');
+      }
+    } catch (err) {
+      setLoadingState(false);
+      showErrorToast(`Error: ${err.message}`);
+    }
+  }
+
+  async function triggerCommand(command) {
+    setLoadingState(true, 'Writing...');
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'GENERATE_COMMAND',
+        data: { command }
+      });
+      setLoadingState(false);
+
+      if (response?.success) {
+        showSuggestionsModal({ casual: response.text }, response.modelUsed, null, false, '', null, '', null, response.title);
+        const commandInput = document.querySelector('.wa-ai-vague-input');
+        if (commandInput) commandInput.value = '';
+      } else {
+        showErrorToast(response?.error || 'Message generation failed.');
       }
     } catch (err) {
       setLoadingState(false);
@@ -396,54 +417,16 @@
   }
 
   /**
-   * Renders quick suggestion pills in the toolbar
-   */
-  function renderQuickPillSuggestions(suggestions) {
-    const toolbar = document.getElementById(TOOLBAR_ID);
-    if (!toolbar) return;
-
-    let pillsContainer = toolbar.querySelector('.wa-ai-quick-pills');
-    if (!pillsContainer) {
-      pillsContainer = document.createElement('div');
-      pillsContainer.className = 'wa-ai-quick-pills';
-      const inner = toolbar.querySelector('.wa-ai-bar-inner');
-      inner.appendChild(pillsContainer);
-    }
-
-    const items = [
-      { tone: 'casual', badge: '💬 Casual', text: suggestions.casual },
-      { tone: 'witty', badge: '😂 Witty', text: suggestions.witty },
-      { tone: 'direct', badge: '🎯 Direct', text: suggestions.direct },
-      { tone: 'hinglish', badge: '🇮🇳 Hinglish', text: suggestions.hinglish }
-    ].filter(item => !!item.text);
-
-    pillsContainer.innerHTML = items.map(item => `
-      <button class="wa-ai-pill-btn" data-text="${escapeHTML(item.text || '')}" title="${escapeHTML(item.badge + ': ' + item.text)}">
-        <span class="wa-ai-pill-badge">${item.badge}</span>
-        <span class="wa-ai-pill-text">${escapeHTML(item.text || '')}</span>
-      </button>
-    `).join('');
-
-    pillsContainer.querySelectorAll('.wa-ai-pill-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const text = btn.getAttribute('data-text');
-        if (text) insertTextIntoInput(text);
-      });
-    });
-  }
-
-  /**
    * Displays full 6-tone human suggestions modal
    */
-  function showSuggestionsModal(suggestions, modelUsed = '', activeTone = null, isFollowUp = false, contactName = 'Contact', personStudy = null, customPrompt = '', intent = null) {
+  function showSuggestionsModal(suggestions, modelUsed = '', activeTone = null, isFollowUp = false, contactName = 'Contact', personStudy = null, customPrompt = '', intent = null, outputTitle = '') {
     removePreviewPopover();
 
     const popover = document.createElement('div');
     popover.id = PREVIEW_ID;
     popover.className = 'wa-ai-preview';
 
-    const tonesList = [
+    const tonesList = outputTitle ? [{ key: 'generated', title: outputTitle, text: suggestions.casual }] : [
       { key: 'casual', title: '💬 Casual & Natural', text: suggestions.casual },
       { key: 'witty', title: '😂 Witty & Playful', text: suggestions.witty },
       { key: 'direct', title: '🎯 Direct & Crisp', text: suggestions.direct },
@@ -452,10 +435,10 @@
       { key: 'quick_ack', title: '⚡ Quick Acknowledgment', text: suggestions.quick_ack }
     ].filter(t => !!t.text);
 
-    let headerTitle = isFollowUp ? `💬 Follow-up to ${escapeHTML(contactName)}` : `✨ Human Replies for ${escapeHTML(contactName)}`;
-    if (intent) {
+    let headerTitle = outputTitle || (isFollowUp ? `💬 Follow-up to ${escapeHTML(contactName)}` : `✨ Human Replies for ${escapeHTML(contactName)}`);
+    if (!outputTitle && intent) {
       headerTitle = `🎯 ${escapeHTML(intent)} → ${escapeHTML(contactName)}`;
-    } else if (customPrompt) {
+    } else if (!outputTitle && customPrompt) {
       headerTitle = `✏️ Refined Thought for ${escapeHTML(contactName)}`;
     }
 
@@ -466,7 +449,7 @@
             <span class="wa-ai-preview-title">${headerTitle}</span>
             ${personStudy ? `<span class="wa-ai-study-chip" title="Tailored with Person Study (Beta)">🧠 Study Applied (${escapeHTML(personStudy.relationship || 'Analyzed')})</span>` : ''}
           </div>
-          ${customPrompt ? `<div class="wa-ai-draft-badge" title="Refining vague draft">✏️ "${escapeHTML(customPrompt)}"</div>` : ''}
+          ${customPrompt && !outputTitle ? `<div class="wa-ai-draft-badge" title="Refining vague draft">✏️ "${escapeHTML(customPrompt)}"</div>` : ''}
         </div>
         <div class="wa-ai-header-controls">
           <span class="wa-ai-preview-model">${escapeHTML(modelUsed || 'OpenRouter')}</span>
@@ -480,17 +463,17 @@
               <span class="wa-ai-card-title">${t.title}</span>
               <div class="wa-ai-card-actions">
                 <button class="wa-ai-card-copy-btn" data-text="${escapeHTML(t.text || '')}" title="Copy to clipboard">📋</button>
-                <button class="wa-ai-card-use-btn" data-text="${escapeHTML(t.text || '')}">🚀 Use This</button>
+                <button class="wa-ai-card-use-btn" data-text="${escapeHTML(t.text || '')}">Use reply</button>
               </div>
             </div>
             <div class="wa-ai-card-body">${escapeHTML(t.text || 'No suggestion')}</div>
           </div>
         `).join('')}
       </div>
-      <div class="wa-ai-preview-footer">
+      ${outputTitle ? '' : `<div class="wa-ai-preview-footer">
         <button class="wa-ai-btn wa-ai-study-btn" id="wa-ai-open-study-btn">🧠 Person Study (Beta)</button>
         <button class="wa-ai-btn wa-ai-btn-copy" id="wa-ai-refresh-btn">🔄 Refresh All</button>
-      </div>
+      </div>`}
     `;
 
     const footer = document.querySelector(SELECTORS.footer) || document.body;
@@ -518,11 +501,11 @@
       });
     });
 
-    popover.querySelector('#wa-ai-refresh-btn').onclick = () => {
-      triggerAIGeneration(activeTone, customPrompt, intent);
-    };
+    const refreshButton = popover.querySelector('#wa-ai-refresh-btn');
+    if (refreshButton) refreshButton.onclick = () => triggerAIGeneration(activeTone, customPrompt, intent);
 
-    popover.querySelector('#wa-ai-open-study-btn').onclick = () => {
+    const studyButton = popover.querySelector('#wa-ai-open-study-btn');
+    if (studyButton) studyButton.onclick = () => {
       removePreviewPopover();
       triggerPersonStudyAnalysis();
     };
@@ -695,35 +678,35 @@
           <span>AI Reply</span>
         </div>
 
-        <button class="wa-ai-tone-btn wa-ai-auto-btn" title="Generate Natural Human Replies (Alt+A)">⚡ Auto</button>
-        <button class="wa-ai-tone-btn wa-ai-study-launch-btn" title="Analyze Contact Persona & Relationship Dynamics">🧠 Person Study (Beta)</button>
-
-        <!-- Quick Intent Chips -->
-        <div class="wa-ai-intents-group">
-          <button class="wa-ai-intent-btn" data-intent="Agree & confirm enthusiastically" title="Agree / Yes">👍 Agree</button>
-          <button class="wa-ai-intent-btn" data-intent="Politely decline or say cannot do this right now" title="Polite Decline">🙅 Decline</button>
-          <button class="wa-ai-intent-btn" data-intent="Say busy right now, will reply properly in some time" title="Busy / Reply Later">⏳ Later</button>
-          <button class="wa-ai-intent-btn" data-intent="Ask for clarification or more details" title="Ask Clarification">❓ Clarify</button>
-        </div>
-
-        <!-- Tone Buttons -->
-        <div class="wa-ai-tones">
-          <button class="wa-ai-tone-btn" data-tone="casual" title="Casual & Natural">💬 Casual</button>
-          <button class="wa-ai-tone-btn" data-tone="witty" title="Witty & Banter">😂 Witty</button>
-          <button class="wa-ai-tone-btn" data-tone="direct" title="Short & Crisp">🎯 Direct</button>
-          <button class="wa-ai-tone-btn" data-tone="hinglish" title="Natural Hinglish / Desi">🇮🇳 Hinglish</button>
-        </div>
-
-        <!-- Vague Thought Input -->
-        <div class="wa-ai-vague-group" title="Type rough thought (e.g. late 10m traffic, shift call?) to refine into natural replies">
-          <span class="wa-ai-vague-icon" aria-hidden="true">✏️</span>
-          <input type="text" class="wa-ai-custom-input wa-ai-vague-input" aria-label="Optional text to refine" placeholder="Optional text to refine..." />
-          <button type="button" class="wa-ai-tone-btn wa-ai-vague-send" title="Refine text">⚡ Refine</button>
-        </div>
+        <button class="wa-ai-tone-btn wa-ai-auto-btn" title="Generate Natural Human Replies (Alt+A)">Generate</button>
+        <button class="wa-ai-more-btn" type="button" aria-expanded="false" aria-controls="wa-ai-controls" aria-label="More reply tools">
+          <span class="wa-ai-more-label">Tools</span><span class="wa-ai-more-chevron" aria-hidden="true"></span>
+        </button>
 
         <div class="wa-ai-status-container">
           <div class="wa-ai-spinner"></div>
           <span class="wa-ai-status" aria-live="polite">Generating...</span>
+        </div>
+      </div>
+      <div class="wa-ai-controls" id="wa-ai-controls">
+        <div class="wa-ai-controls-row">
+          <button class="wa-ai-tone-btn wa-ai-study-launch-btn" title="Analyze Contact Persona & Relationship Dynamics">Person Study</button>
+          <div class="wa-ai-intents-group">
+            <button class="wa-ai-intent-btn" data-intent="Agree & confirm enthusiastically" title="Agree / Yes">Agree</button>
+            <button class="wa-ai-intent-btn" data-intent="Politely decline or say cannot do this right now" title="Polite Decline">Decline</button>
+            <button class="wa-ai-intent-btn" data-intent="Say busy right now, will reply properly in some time" title="Busy / Reply Later">Later</button>
+            <button class="wa-ai-intent-btn" data-intent="Ask for clarification or more details" title="Ask Clarification">Clarify</button>
+          </div>
+          <div class="wa-ai-tones">
+            <button class="wa-ai-tone-btn" data-tone="casual" title="Casual & Natural">Casual</button>
+            <button class="wa-ai-tone-btn" data-tone="witty" title="Witty & Banter">Witty</button>
+            <button class="wa-ai-tone-btn" data-tone="direct" title="Short & Crisp">Direct</button>
+            <button class="wa-ai-tone-btn" data-tone="hinglish" title="Natural Hinglish / Desi">Hinglish</button>
+          </div>
+        </div>
+        <div class="wa-ai-vague-group" title="Type rough thought to refine into natural replies">
+          <input type="text" class="wa-ai-custom-input wa-ai-vague-input" aria-label="Optional text to refine" placeholder="Reply to refine, or /write…" />
+          <button type="button" class="wa-ai-tone-btn wa-ai-vague-send" title="Refine text">Refine</button>
         </div>
       </div>
     `;
@@ -732,6 +715,11 @@
 
     const vagueInput = toolbar.querySelector('.wa-ai-vague-input');
     const getVagueDraft = () => (vagueInput ? vagueInput.value.trim() : '');
+    const moreButton = toolbar.querySelector('.wa-ai-more-btn');
+    moreButton.addEventListener('click', () => {
+      const expanded = toolbar.classList.toggle('wa-ai-expanded');
+      moreButton.setAttribute('aria-expanded', String(expanded));
+    });
 
     toolbar.querySelector('.wa-ai-auto-btn').addEventListener('click', (e) => {
       e.preventDefault();
@@ -765,7 +753,11 @@
     const handleVagueSubmit = () => {
       const draftVal = getVagueDraft();
       const chatText = (document.querySelector(SELECTORS.chatInput)?.innerText || '').trim();
-      triggerTextRefinement(draftVal || chatText);
+      if (/^\/(sorry|poem|story|write)\b/i.test(draftVal)) {
+        triggerCommand(draftVal);
+      } else {
+        triggerTextRefinement(draftVal || chatText);
+      }
     };
 
     vagueSendBtn.addEventListener('click', (e) => {

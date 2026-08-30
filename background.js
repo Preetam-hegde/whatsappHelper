@@ -29,6 +29,18 @@ function isOllamaProvider(provider) {
   return provider === 'ollama';
 }
 
+function parseWriteCommand(rawCommand) {
+  const match = typeof rawCommand === 'string' && rawCommand.trim().match(/^\/(sorry|poem|story|write)\s+(.+)/i);
+  if (!match) return null;
+
+  const kind = match[1].toLowerCase();
+  return {
+    kind,
+    request: match[2].trim(),
+    title: { sorry: 'Sorry message', poem: 'Poem', story: 'Story', write: 'Message' }[kind]
+  };
+}
+
 function getModelsToTry(apiKey, rawModel) {
   if (isGoogleStudioKey(apiKey)) {
     let model = rawModel;
@@ -109,6 +121,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.action === 'GENERATE_COMMAND') {
+    handleGenerateCommand(request.data)
+      .then(response => sendResponse(response))
+      .catch(error => sendResponse({ success: false, error: error.message || 'Message generation failed' }));
+    return true;
+  }
+
   if (request.action === 'ANALYZE_PERSON_STUDY') {
     handleAnalyzePersonStudy(request.data)
       .then(response => sendResponse(response))
@@ -150,6 +169,39 @@ async function handleRefineText(data) {
 
   refinedText = typeof refinedText === 'string' ? refinedText.replace(/^```(?:text)?\s*|\s*```$/gi, '').trim() : '';
   return refinedText ? { success: true, refinedText, modelUsed: model } : { success: false, error: 'The model returned no refined text.' };
+}
+
+async function handleGenerateCommand(data) {
+  const command = parseWriteCommand(data?.command);
+  if (!command) return { success: false, error: 'Use /sorry, /poem, /story, or /write followed by what you need.' };
+
+  const storage = await chrome.storage.local.get(['openrouterApiKey', 'openrouterModel', 'provider', 'ollamaModel']);
+  const apiKey = storage.openrouterApiKey?.trim();
+  const provider = storage.provider || 'auto';
+  const rawModel = provider === 'ollama' ? (storage.ollamaModel?.trim() || 'qwen3') : (storage.openrouterModel?.trim() || DEFAULT_MODEL);
+  if (!apiKey && !isOllamaProvider(provider)) {
+    return { success: false, error: 'API Key is missing. Click the extension icon in Chrome toolbar to set your key.' };
+  }
+
+  const instructions = {
+    sorry: 'Write one sincere, concise WhatsApp apology.',
+    poem: 'Write one short, warm poem suitable to paste into WhatsApp.',
+    story: 'Write one short, engaging story suitable to send in WhatsApp.',
+    write: 'Write one concise, natural WhatsApp-ready message.'
+  };
+  const systemPrompt = `${instructions[command.kind]} Return only the requested text, with no title, explanation, or markdown fence.`;
+  const userPrompt = `Request: ${command.request}`;
+  const isGoogle = !isOllamaProvider(provider) && isGoogleStudioKey(apiKey);
+  const model = isGoogle && rawModel.includes('/') ? 'gemini-3.6-flash' : rawModel.replace(/^google\//, '');
+
+  let text = isOllamaProvider(provider)
+    ? await callOllama(model, systemPrompt, userPrompt, 0.75)
+    : isGoogle
+    ? await callGoogleAIStudio(apiKey, model, systemPrompt, userPrompt, 'text/plain')
+    : await callOpenRouter(apiKey, model, systemPrompt, userPrompt, 0.75, 500);
+
+  text = typeof text === 'string' ? text.replace(/^```(?:text|markdown)?\s*|\s*```$/gi, '').trim() : '';
+  return text ? { success: true, text, title: command.title, modelUsed: model } : { success: false, error: 'The model returned no text.' };
 }
 
 /**
@@ -488,7 +540,7 @@ function parseStudyJSON(text) {
 /**
  * Sends API requests directly to Google AI Studio v1beta API endpoints.
  */
-async function callGoogleAIStudio(apiKey, model, systemPrompt, userPrompt) {
+async function callGoogleAIStudio(apiKey, model, systemPrompt, userPrompt, responseMimeType = 'application/json') {
   let cleanModel = model;
   if (cleanModel.startsWith('google/')) cleanModel = cleanModel.replace('google/', '');
 
@@ -529,7 +581,7 @@ async function callGoogleAIStudio(apiKey, model, systemPrompt, userPrompt) {
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: systemPrompt }] },
       contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-      generationConfig: { temperature: 0.75, responseMimeType: 'application/json' }
+      generationConfig: { temperature: 0.75, responseMimeType }
     })
   });
 
