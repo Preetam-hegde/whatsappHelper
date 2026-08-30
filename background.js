@@ -25,6 +25,52 @@ function isGoogleStudioKey(key) {
   return k.startsWith('AQ') || k.startsWith('AIza');
 }
 
+function getModelsToTry(apiKey, rawModel) {
+  if (isGoogleStudioKey(apiKey)) {
+    let model = rawModel;
+    if (model.startsWith('google/')) model = model.replace('google/', '');
+    if (model.includes('/')) model = 'gemini-3.6-flash';
+    return [model, ...GOOGLE_FALLBACK_MODELS.filter(candidate => candidate !== model)];
+  }
+  return [rawModel, ...FALLBACK_MODELS.filter(candidate => candidate !== rawModel)];
+}
+
+async function callOpenRouter(apiKey, model, systemPrompt, userPrompt, temperature, maxTokens) {
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://web.whatsapp.com',
+      'X-Title': 'WhatsApp Web AI Assistant'
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature,
+      max_tokens: maxTokens
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let message = errorText;
+    try {
+      const parsed = JSON.parse(errorText);
+      message = parsed.error?.message || parsed.message || errorText;
+    } catch (_) {}
+    throw new Error(`[${model}] API Error (${response.status}): ${message}`);
+  }
+
+  const data = await response.json();
+  if (data.error) throw new Error(`[${model}] API Error: ${data.error.message || JSON.stringify(data.error)}`);
+  const choice = data.choices?.[0];
+  return choice?.message?.content || choice?.text || '';
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'GENERATE_REPLY' || request.action === 'GENERATE_SUGGESTIONS') {
     handleGenerateSuggestions(request.data)
@@ -72,32 +118,9 @@ async function handleRefineText(data) {
   const model = isGoogle && rawModel.includes('/') ? 'gemini-3.6-flash' : rawModel.replace(/^google\//, '');
   let refinedText = '';
 
-  if (isGoogle) {
-    refinedText = await callGoogleAIStudio(apiKey, model, 'You refine text only. Return only the refined text.', prompt);
-  } else {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://web.whatsapp.com',
-        'X-Title': 'WhatsApp Web AI Assistant'
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: 'You refine text only. Return only the refined text.' },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.4,
-        max_tokens: 300
-      })
-    });
-
-    if (!response.ok) throw new Error(`API Error (${response.status}): ${await response.text()}`);
-    const responseData = await response.json();
-    refinedText = responseData.choices?.[0]?.message?.content || responseData.choices?.[0]?.text || '';
-  }
+  refinedText = isGoogle
+    ? await callGoogleAIStudio(apiKey, model, 'You refine text only. Return only the refined text.', prompt)
+    : await callOpenRouter(apiKey, model, 'You refine text only. Return only the refined text.', prompt, 0.4, 300);
 
   refinedText = typeof refinedText === 'string' ? refinedText.replace(/^```(?:text)?\s*|\s*```$/gi, '').trim() : '';
   return refinedText ? { success: true, refinedText, modelUsed: model } : { success: false, error: 'The model returned no refined text.' };
@@ -138,16 +161,7 @@ async function handleGenerateSuggestions(data) {
   }
 
   const isGoogle = isGoogleStudioKey(apiKey);
-  let modelsToTry = [];
-
-  if (isGoogle) {
-    let cleanModel = rawModel;
-    if (cleanModel.startsWith('google/')) cleanModel = cleanModel.replace('google/', '');
-    if (cleanModel.includes('/')) cleanModel = 'gemini-3.6-flash';
-    modelsToTry = [cleanModel, ...GOOGLE_FALLBACK_MODELS.filter(m => m !== cleanModel)];
-  } else {
-    modelsToTry = [rawModel, ...FALLBACK_MODELS.filter(m => m !== rawModel)];
-  }
+  const modelsToTry = getModelsToTry(apiKey, rawModel);
 
   // Analyze writing style into a structured fingerprint
   const writingStyleBlock = analyzeWritingStyle(userWritingSamples);
@@ -230,42 +244,7 @@ async function handleGenerateSuggestions(data) {
       if (isGoogle) {
         rawContent = await callGoogleAIStudio(apiKey, currentModel, systemPrompt, userPrompt);
       } else {
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://web.whatsapp.com',
-            'X-Title': 'WhatsApp Web AI Assistant'
-          },
-          body: JSON.stringify({
-            model: currentModel,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userPrompt }
-            ],
-            temperature: 0.75,
-            max_tokens: 700
-          })
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          let parsedError = errorText;
-          try {
-            const jsonErr = JSON.parse(errorText);
-            parsedError = jsonErr.error?.message || jsonErr.message || errorText;
-          } catch (e) {}
-          throw new Error(`[${currentModel}] API Error (${response.status}): ${parsedError}`);
-        }
-
-        const resData = await response.json();
-        if (resData.error) {
-          throw new Error(`[${currentModel}] API Error: ${resData.error.message || JSON.stringify(resData.error)}`);
-        }
-
-        const choice = resData.choices?.[0];
-        rawContent = choice?.message?.content || choice?.text || '';
+        rawContent = await callOpenRouter(apiKey, currentModel, systemPrompt, userPrompt, 0.75, 700);
       }
 
       if (Array.isArray(rawContent)) {
@@ -325,16 +304,7 @@ async function handleAnalyzePersonStudy(data) {
   }
 
   const isGoogle = isGoogleStudioKey(apiKey);
-  let modelsToTry = [];
-
-  if (isGoogle) {
-    let cleanModel = rawModel;
-    if (cleanModel.startsWith('google/')) cleanModel = cleanModel.replace('google/', '');
-    if (cleanModel.includes('/')) cleanModel = 'gemini-3.6-flash';
-    modelsToTry = [cleanModel, ...GOOGLE_FALLBACK_MODELS.filter(m => m !== cleanModel)];
-  } else {
-    modelsToTry = [rawModel, ...FALLBACK_MODELS.filter(m => m !== rawModel)];
-  }
+  const modelsToTry = getModelsToTry(apiKey, rawModel);
 
   const fullContextText = (Array.isArray(context) && context.length > 0)
     ? context.map((m, i) => `${i + 1}. ${m.isOutgoing ? 'Me' : (m.sender || contactName)}${m.time ? ' [' + m.time + ']' : ''}: "${m.text}"`).join('\n')
@@ -353,33 +323,7 @@ async function handleAnalyzePersonStudy(data) {
       if (isGoogle) {
         rawContent = await callGoogleAIStudio(apiKey, currentModel, systemPrompt, userPrompt);
       } else {
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://web.whatsapp.com',
-            'X-Title': 'WhatsApp Web AI Assistant'
-          },
-          body: JSON.stringify({
-            model: currentModel,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userPrompt }
-            ],
-            temperature: 0.6,
-            max_tokens: 800
-          })
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`[${currentModel}] API Error (${response.status}): ${errorText}`);
-        }
-
-        const resData = await response.json();
-        const choice = resData.choices?.[0];
-        rawContent = choice?.message?.content || choice?.text || '';
+        rawContent = await callOpenRouter(apiKey, currentModel, systemPrompt, userPrompt, 0.6, 800);
       }
 
       if (Array.isArray(rawContent)) {
@@ -585,33 +529,7 @@ async function handleValidateKey(data) {
       if (res) return { valid: true };
       return { valid: false, error: 'Empty response from Google API' };
     } else {
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://web.whatsapp.com',
-          'X-Title': 'WhatsApp Web AI Assistant'
-        },
-        body: JSON.stringify({
-          model: testModel,
-          messages: [
-            { role: 'user', content: 'Hi' }
-          ],
-          max_tokens: 5
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        let msg = errorData;
-        try {
-          const parsed = JSON.parse(errorData);
-          msg = parsed.error?.message || parsed.message || errorData;
-        } catch(e){}
-        return { valid: false, error: `[${response.status}] ${msg}` };
-      }
-
+      await callOpenRouter(apiKey, testModel, '', 'Hi', 0, 5);
       return { valid: true };
     }
   } catch (err) {
