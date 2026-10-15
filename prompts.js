@@ -104,13 +104,16 @@ Output strictly the humanized JSON object with the 6 tones now.`;
 }
 
 function buildRefinementPrompt(sourceText) {
-  return `Refine only the text between the markers.
+  return `Rewrite only the text between the markers so it sounds like a real person typed it on WhatsApp.
 
 Rules:
-- Preserve the original meaning and intent.
-- Improve grammar, clarity, and natural WhatsApp wording.
+- Keep the exact meaning, intent, and point of view (I stays I, you stays you).
+- Fix grammar and spelling, then loosen stiff or formal phrasing into everyday speech.
+- Keep the author's language, mix of languages, and tone. Do not translate.
+- Keep it about the same length. Short stays short.
+- No corporate filler, no "I hope this finds you well", no exclamation marks or emojis unless the original has them.
 - Do not add a reply, context, greeting, explanation, or new information.
-- Return only the refined text.
+- Return only the refined text, nothing else.
 
 TEXT TO REFINE:
 ---

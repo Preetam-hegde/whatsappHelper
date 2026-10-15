@@ -325,7 +325,7 @@
       if (response?.success) {
         insertTextIntoInput(response.refinedText, true);
         const vagueInput = document.querySelector('.wa-ai-vague-input');
-        if (vagueInput) vagueInput.value = '';
+        if (vagueInput) { vagueInput.value = ''; vagueInput.dispatchEvent(new Event('input')); }
       } else {
         showErrorToast(response?.error || 'Text refinement failed.');
       }
@@ -338,16 +338,17 @@
   async function triggerCommand(command) {
     setLoadingState(true, 'Writing...');
     try {
+      const [details, styleSamples] = [scrapeConversationDetails(15), await getAccumulatedStyleSamples()];
       const response = await chrome.runtime.sendMessage({
         action: 'GENERATE_COMMAND',
-        data: { command }
+        data: { command, context: details.messages, contactName: details.contactName, writingStyle: styleSamples }
       });
       setLoadingState(false);
 
       if (response?.success) {
         showSuggestionsModal({ casual: response.text }, response.modelUsed, null, false, '', null, '', null, response.title);
         const commandInput = document.querySelector('.wa-ai-vague-input');
-        if (commandInput) commandInput.value = '';
+        if (commandInput) { commandInput.value = ''; commandInput.dispatchEvent(new Event('input')); }
       } else {
         showErrorToast(response?.error || 'Message generation failed.');
       }
@@ -704,9 +705,9 @@
             <button class="wa-ai-tone-btn" data-tone="hinglish" title="Natural Hinglish / Desi">Hinglish</button>
           </div>
         </div>
-        <div class="wa-ai-vague-group" title="Type rough thought to refine into natural replies">
-          <input type="text" class="wa-ai-custom-input wa-ai-vague-input" aria-label="Optional text to refine" placeholder="Reply to refine, or /write…" />
-          <button type="button" class="wa-ai-tone-btn wa-ai-vague-send" title="Refine text">Refine</button>
+        <div class="wa-ai-vague-group" title="Default: rewrite. Use /ai for creative or custom instructions.">
+          <textarea class="wa-ai-custom-input wa-ai-vague-input" aria-label="Text to rewrite or AI instruction" rows="1" placeholder="Rewrite text, or /ai write a poem…"></textarea>
+          <button type="button" class="wa-ai-tone-btn wa-ai-vague-send" title="Rewrite text (default)">Rewrite</button>
         </div>
       </div>
     `;
@@ -715,6 +716,12 @@
 
     const vagueInput = toolbar.querySelector('.wa-ai-vague-input');
     const getVagueDraft = () => (vagueInput ? vagueInput.value.trim() : '');
+    const resizeVagueInput = () => {
+      if (!vagueInput) return;
+      vagueInput.style.height = 'auto';
+      vagueInput.style.height = `${Math.min(vagueInput.scrollHeight, 132)}px`;
+      vagueInput.style.overflowY = vagueInput.scrollHeight > 132 ? 'auto' : 'hidden';
+    };
     const moreButton = toolbar.querySelector('.wa-ai-more-btn');
     moreButton.addEventListener('click', () => {
       const expanded = toolbar.classList.toggle('wa-ai-expanded');
@@ -754,9 +761,13 @@
       const draftVal = getVagueDraft();
       const chatText = (document.querySelector(SELECTORS.chatInput)?.innerText || '').trim();
       if (/^\/(sorry|poem|story|write)\b/i.test(draftVal)) {
-        triggerCommand(draftVal);
+        showErrorToast('Use /ai followed by what you need, e.g. /ai write a poem.');
+      } else if (/^\/ai\b/i.test(draftVal)) {
+        if (/^\/ai\s*$/i.test(draftVal)) showErrorToast('Use /ai followed by what you need.');
+        else triggerCommand(draftVal);
       } else {
-        triggerTextRefinement(draftVal || chatText);
+        const rewriteText = draftVal.replace(/^\/rewrite\b\s*/i, '').trim() || chatText;
+        triggerTextRefinement(rewriteText);
       }
     };
 
@@ -766,12 +777,16 @@
     });
 
     if (vagueInput) {
+      vagueInput.addEventListener('input', resizeVagueInput);
       vagueInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
-          e.preventDefault();
-          handleVagueSubmit();
+          if (!e.shiftKey) {
+            e.preventDefault();
+            handleVagueSubmit();
+          }
         }
       });
+      resizeVagueInput();
     }
   }
 

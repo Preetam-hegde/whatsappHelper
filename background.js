@@ -30,14 +30,13 @@ function isOllamaProvider(provider) {
 }
 
 function parseWriteCommand(rawCommand) {
-  const match = typeof rawCommand === 'string' && rawCommand.trim().match(/^\/(sorry|poem|story|write)\s+(.+)/i);
+  const match = typeof rawCommand === 'string' && rawCommand.trim().match(/^\/ai\s+([\s\S]+)$/i);
   if (!match) return null;
 
-  const kind = match[1].toLowerCase();
   return {
-    kind,
-    request: match[2].trim(),
-    title: { sorry: 'Sorry message', poem: 'Poem', story: 'Story', write: 'Message' }[kind]
+    kind: 'ai',
+    request: match[1].trim(),
+    title: 'AI draft'
   };
 }
 
@@ -173,7 +172,7 @@ async function handleRefineText(data) {
 
 async function handleGenerateCommand(data) {
   const command = parseWriteCommand(data?.command);
-  if (!command) return { success: false, error: 'Use /sorry, /poem, /story, or /write followed by what you need.' };
+  if (!command) return { success: false, error: 'Use /ai followed by what you need.' };
 
   const storage = await chrome.storage.local.get(['openrouterApiKey', 'openrouterModel', 'provider', 'ollamaModel']);
   const apiKey = storage.openrouterApiKey?.trim();
@@ -183,14 +182,23 @@ async function handleGenerateCommand(data) {
     return { success: false, error: 'API Key is missing. Click the extension icon in Chrome toolbar to set your key.' };
   }
 
-  const instructions = {
-    sorry: 'Write one sincere, concise WhatsApp apology.',
-    poem: 'Write one short, warm poem suitable to paste into WhatsApp.',
-    story: 'Write one short, engaging story suitable to send in WhatsApp.',
-    write: 'Write one concise, natural WhatsApp-ready message.'
-  };
-  const systemPrompt = `${instructions[command.kind]} Return only the requested text, with no title, explanation, or markdown fence.`;
-  const userPrompt = `Request: ${command.request}`;
+  const systemPrompt = `You are the user's ghostwriter on WhatsApp. Write exactly what they asked for, in their own voice, as if they typed it themselves.
+- Follow the /ai request precisely: its format, length, and purpose.
+- Match their writing style (language, slang, casing, emoji habits) and the mood of the chat. Use the conversation history only when it helps.
+- Sound like a real person: specific, warm, natural. Avoid cliches, stock phrases, over-polished wording, and AI-sounding openers.
+- Be moderately creative (3 out of 5). Poems, stories, and scripts can be vivid, but a message should stay short and sendable.
+- Return only the text to send, with no title, quotes, explanation, or markdown fence.`;
+  const userPrompt = `USER REQUEST:
+${command.request}
+
+USER WRITING STYLE:
+${Array.isArray(data?.writingStyle) && data.writingStyle.length ? analyzeWritingStyle(data.writingStyle) : 'Natural, casual texting style.'}
+
+CHAT WITH:
+${data?.contactName || 'Contact'}
+
+CONVERSATION HISTORY (use as context when relevant):
+${data?.context ? JSON.stringify(data.context) : 'No conversation history available.'}`;
   const isGoogle = !isOllamaProvider(provider) && isGoogleStudioKey(apiKey);
   const model = isGoogle && rawModel.includes('/') ? 'gemini-3.6-flash' : rawModel.replace(/^google\//, '');
 

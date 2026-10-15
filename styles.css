@@ -221,6 +221,17 @@
   width: 100%;
 }
 
+.wa-ai-vague-input {
+  display: block;
+  min-height: 22px;
+  max-height: 132px;
+  resize: none;
+  overflow-y: hidden;
+  line-height: 1.4;
+  font-family: inherit;
+  padding: 3px 0;
+}
+
 .wa-ai-custom-input::placeholder {
   color: #8696a0;
 }
@@ -965,6 +976,7 @@
   padding: 2px 3px 2px 9px;
   border-radius: 8px;
   background: var(--wa-ai-subtle);
+  align-items: flex-end;
 }
 
 .wa-ai-vague-send {
